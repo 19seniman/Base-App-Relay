@@ -1,0 +1,15 @@
+{
+  "name": "base-swap-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "swap":  "node src/index.js swap",
+    "check": "node src/index.js check"
+  },
+  "dependencies": {
+    "ethers": "^6.13.0",
+    "dotenv": "^16.4.5"
+  }
+}
+
