@@ -18,14 +18,13 @@ export class BaseSwapper {
                 destinationCurrency: params.tokenOut === "native" ? "0x0000000000000000000000000000000000000000" : params.tokenOut,
                 amount: params.amountIn.toString(),
                 tradeType: "EXACT_INPUT",
-                useExternalLiquidity: true, // Mencari rute lebih luas (Uniswap, Aerodrome, dll)
-                referrer: "relay.link/swap" // Opsional: membantu rute agar lebih stabil
+                useExternalLiquidity: true,
+                referrer: "relay.link/swap"
             })
         });
 
         const data = await response.json();
         
-        // Eror handling yang lebih detail
         if (data.error || !data.steps) {
             const errorMsg = data.message || "Gagal mengambil quote dari Relay";
             if (errorMsg.includes("no routes found")) {
@@ -39,23 +38,43 @@ export class BaseSwapper {
     async swap(params) {
         const quote = await this.getRelayQuote(params);
 
-        // Relay memberikan langkah-langkah (steps) yang harus dilakukan
+        console.log(`   🔄 Memproses ${quote.steps.length} langkah transaksi...`);
+
+        let lastResponse;
+
+        // Relay memberikan langkah-langkah (steps) yang harus dilakukan secara berurutan
         for (const step of quote.steps) {
+            console.log(`   🔸 Menjalankan: ${step.description || step.action}`);
+            
             for (const item of step.items) {
-                // Gunakan estimasi gas dari Relay jika tersedia, jika tidak pakai fallback 350.000
-                const tx = {
+                // Perbaikan format ARGUMENT agar compatible dengan Ethers v6
+                const txRequest = {
                     to: item.to,
                     data: item.data,
                     value: item.value ? ethers.getBigInt(item.value) : 0n,
-                    gasLimit: item.gasLimit ? ethers.getBigInt(item.gasLimit) : 350000n 
                 };
 
-                const response = await this.wallet.sendTransaction(tx);
-                console.log(`   🔗 Menunggu konfirmasi: ${response.hash}`);
-                await response.wait();
-                return { tx: response };
+                // Jika Relay memberikan estimasi gas, gunakan. Jika tidak, biarkan Ethers menghitung otomatis.
+                if (item.gasLimit) {
+                    txRequest.gasLimit = ethers.getBigInt(item.gasLimit);
+                }
+
+                try {
+                    const response = await this.wallet.sendTransaction(txRequest);
+                    console.log(`   🔗 Hash: ${response.hash}`);
+                    
+                    const receipt = await response.wait();
+                    if (receipt.status === 0) throw new Error("Transaksi gagal (Reverted)");
+                    
+                    lastResponse = response;
+                } catch (err) {
+                    console.error(`   ❌ Eror pada langkah ini: ${err.reason || err.message}`);
+                    throw err;
+                }
             }
         }
+        // Mengembalikan response terakhir agar index.js bisa menampilkan hash-nya
+        return { tx: lastResponse };
     }
 
     async getTokenInfo(address) {
@@ -70,9 +89,9 @@ export class BaseSwapper {
         ];
         const contract = new ethers.Contract(address, abi, this.provider);
         const [balance, decimals, symbol] = await Promise.all([
-            contract.balanceOf(this.wallet.address),
-            contract.decimals(),
-            contract.symbol()
+            contract.balanceOf(this.wallet.address).catch(() => 0n),
+            contract.decimals().catch(() => 18),
+            contract.symbol().catch(() => "TOKEN")
         ]);
         return { balance, decimals, symbol };
     }
