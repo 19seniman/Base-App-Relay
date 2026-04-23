@@ -25,8 +25,8 @@ base-swap-bot/
 ### 1. Install dependencies
 
 ```bash
-git clone https://github.com/19seniman/Base-App.git
-cd Base-App
+git clone https://github.com/19seniman/Base-App-Relay.git
+cd Base-App-Relay
 npm install
 npm install node-cron
 ```
