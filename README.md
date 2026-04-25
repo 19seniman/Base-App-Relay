@@ -1,5 +1,7 @@
 # 🔵 Base Network Swap Bot
 
+TAHAP PERBAIKAN
+
 Bot Node.js untuk melakukan swap/trade token di **Base Network** menggunakan **Uniswap V3**.
 
 ---
